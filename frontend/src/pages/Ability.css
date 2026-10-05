@@ -1,0 +1,142 @@
+* {
+    box-sizing: border-box;
+}
+
+.ability-page {
+    min-height: 100vh;
+    background: #f4f5f7;
+    padding: 40px 20px;
+    color: #171717;
+}
+
+.ability-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* HERO */
+
+.ability-hero {
+    position: relative;
+    padding: 70px 50px 50px;
+    border-radius: 32px;
+    background: linear-gradient(135deg, #9be07a, #3fae6a);
+}
+
+.ability-number {
+    position: absolute;
+    top: 30px;
+    left: 40px;
+    font-size: 20px;
+    font-weight: 800;
+    opacity: 0.35;
+}
+
+.ability-hero h1 {
+    margin: 0 0 20px;
+    font-size: 72px;
+    line-height: 1;
+    text-transform: capitalize;
+    letter-spacing: -3px;
+}
+
+.ability-types {
+    display: flex;
+    gap: 10px;
+}
+
+.type {
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.35);
+    font-weight: 700;
+    text-transform: capitalize;
+    backdrop-filter: blur(5px);
+}
+
+/* SECTIONS */
+
+.ability-section {
+    margin-top: 24px;
+    padding: 32px;
+    border-radius: 24px;
+    background: white;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+}
+
+.ability-section h2 {
+    margin: 0 0 25px;
+    font-size: 24px;
+}
+
+/* DESCRIPTION */
+
+.ability-description {
+    font-size: 18px;
+    line-height: 1.7;
+}
+
+.ability-description p {
+    margin: 0 0 12px;
+}
+
+.ability-short-effect {
+    font-size: 14px;
+    opacity: 0.55;
+}
+
+/* TAGS */
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.tag {
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: #f1f2f4;
+    font-size: 14px;
+    text-transform: capitalize;
+}
+
+/* LOADING / ERROR */
+
+.ability-loading,
+.ability-error {
+    max-width: 600px;
+    margin: 100px auto;
+    text-align: center;
+}
+
+.ability-error {
+    padding: 50px;
+    border-radius: 24px;
+    background: white;
+}
+
+/* MOBILE */
+
+@media (max-width: 700px) {
+    .ability-page {
+        padding: 15px;
+    }
+
+    .ability-hero {
+        padding: 60px 25px 40px;
+        text-align: center;
+    }
+
+    .ability-hero h1 {
+        font-size: 52px;
+    }
+
+    .ability-types {
+        justify-content: center;
+    }
+
+    .ability-section {
+        padding: 24px;
+    }
+}
