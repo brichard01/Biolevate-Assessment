@@ -151,8 +151,9 @@ def all_types(conn):
 
 # Search
 
-def search(conn, table, columns, query_text, minimums, maximums, types):
+def build_filters(table, minimums, maximums, types):
     # minimums / maximums: {column: value}, e.g. {"speed": 90}. types: e.g. ["fire", "water"].
+    # Returns the SQL conditions and the values for their placeholders.
     conditions = []
     values = {}
 
@@ -169,6 +170,12 @@ def search(conn, table, columns, query_text, minimums, maximums, types):
                     sql.Identifier(column), sql.SQL(operator), sql.Placeholder(key)
                 )
             )
+
+    return conditions, values
+
+
+def search(conn, table, columns, query_text, minimums, maximums, types):
+    conditions, values = build_filters(table, minimums, maximums, types)
 
     # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
     # word_similarity handles typos and partial names, starts_with ranks prefixes first.
