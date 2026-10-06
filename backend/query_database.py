@@ -3,6 +3,13 @@ from psycopg import sql
 # Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
 NAME_SIMILARITY_THRESHOLD = 0.3
 
+# Text column searched in description mode (it must be in the table's BM25 index).
+DESCRIPTION_COLUMNS = {
+    "pokemon": "description",
+    "moves": "effect",
+    "abilities": "effect",
+}
+
 # Keep a row if it has at least one of the selected types.
 TYPE_CONDITIONS = {
     "pokemon": "types && %(types)s",  # Pokemon have a list of types: the lists must overlap.
@@ -174,25 +181,44 @@ def build_filters(table, minimums, maximums, types):
     return conditions, values
 
 
-def search(conn, table, columns, query_text, minimums, maximums, types):
-    conditions, values = build_filters(table, minimums, maximums, types)
-
+def name_match(query_text):
     # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
     # word_similarity handles typos and partial names, starts_with ranks prefixes first.
-    query_text = query_text.strip().lower().replace("-", " ")
     name = sql.SQL("replace(name, '-', ' ')")
+    values = {
+        "q": query_text.lower().replace("-", " "),
+        "threshold": NAME_SIMILARITY_THRESHOLD,
+    }
+    condition = sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
+    order_by = sql.SQL(
+        "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
+        "similarity(%(q)s, {name}) DESC, id"
+    ).format(name=name)
+    return condition, order_by, values
+
+
+def description_match(table, query_text):
+    # BM25 keyword search: ||| keeps rows containing at least one word of the query,
+    # pdb.score ranks rows with more (and rarer) matching words first.
+    condition = sql.SQL("{} ||| %(q)s").format(sql.Identifier(DESCRIPTION_COLUMNS[table]))
+    order_by = sql.SQL("pdb.score(id) DESC, id")
+    return condition, order_by, {"q": query_text}
+
+
+def search(conn, table, columns, query_text, mode, minimums, maximums, types):
+    # mode: "name" (fuzzy search on names) or "description" (BM25 search on descriptions).
+    conditions, values = build_filters(table, minimums, maximums, types)
     order_by = sql.SQL("id")
 
+    query_text = query_text.strip()
     if query_text:
-        values["q"] = query_text
-        values["threshold"] = NAME_SIMILARITY_THRESHOLD
-        conditions.append(
-            sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
-        )
-        order_by = sql.SQL(
-            "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
-            "similarity(%(q)s, {name}) DESC, id"
-        ).format(name=name)
+        if mode == "description":
+            condition, order_by, match_values = description_match(table, query_text)
+        else:
+            condition, order_by, match_values = name_match(query_text)
+
+        conditions.append(condition)
+        values.update(match_values)
 
     query = sql.SQL("SELECT {columns} FROM {table}").format(
         columns=sql.SQL(", ").join(sql.Identifier(c) for c in columns),

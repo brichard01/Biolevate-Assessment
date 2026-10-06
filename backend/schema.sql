@@ -73,9 +73,22 @@ CREATE INDEX ON pokemon (speed);
 CREATE INDEX ON pokemon_moves (move_id);
 CREATE INDEX ON pokemon_abilities (ability_id);
 
-CREATE INDEX ON pokemon   USING bm25 (id, name, genus, description) WITH (key_field = 'id');
-CREATE INDEX ON moves     USING bm25 (id, name, effect, type)       WITH (key_field = 'id');
-CREATE INDEX ON abilities USING bm25 (id, name, effect)             WITH (key_field = 'id');
+-- BM25 indexes for the description search. Text is lowercased, English stopwords are removed
+-- ("the", "to"...) and words are stemmed ("sleeping" -> "sleep").
+CREATE INDEX ON pokemon USING bm25 (
+    id,
+    (description::pdb.simple('stemmer=english', 'stopwords_language=english'))
+) WITH (key_field = 'id');
+
+CREATE INDEX ON moves USING bm25 (
+    id,
+    (effect::pdb.simple('stemmer=english', 'stopwords_language=english'))
+) WITH (key_field = 'id');
+
+CREATE INDEX ON abilities USING bm25 (
+    id,
+    (effect::pdb.simple('stemmer=english', 'stopwords_language=english'))
+) WITH (key_field = 'id');
 
 CREATE INDEX ON pokemon   USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX ON moves     USING hnsw (embedding vector_cosine_ops);

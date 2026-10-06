@@ -35,6 +35,17 @@ const CATEGORIES = {
     },
 };
 
+const SEARCH_MODES = {
+    name: {
+        label: "Name",
+        placeholder: (category) => `Search ${category} by name...`,
+    },
+    description: {
+        label: "Description",
+        placeholder: () => "Describe what you are looking for...",
+    },
+};
+
 function formatName(name) {
     return name.replaceAll("-", " ");
 }
@@ -99,8 +110,8 @@ function AbilityPreview({ ability }) {
     );
 }
 
-function fetchResults(category, query, filterValues, types) {
-    const params = new URLSearchParams({ category, q: query.trim() });
+function fetchResults(category, query, mode, filterValues, types) {
+    const params = new URLSearchParams({ category, q: query.trim(), mode });
     for (const [key, value] of Object.entries(filterValues)) {
         if (value !== "") {
             params.set(key, value);
@@ -194,6 +205,7 @@ function TypeFilter({ types, selected, onToggle, open, onOpenChange }) {
 function Search() {
     const [category, setCategory] = useState("pokemon");
     const [query, setQuery] = useState("");
+    const [searchMode, setSearchMode] = useState("name");
     const [filterValues, setFilterValues] = useState({});
     const [bounds, setBounds] = useState(null);
     const [allTypes, setAllTypes] = useState([]);
@@ -208,7 +220,7 @@ function Search() {
 
     // Display every Pokémon when the page opens.
     useEffect(() => {
-        fetchResults("pokemon", "", {}, [])
+        fetchResults("pokemon", "", "name", {}, [])
             .then(setResults)
             .catch((error) => setError(error.message))
             .finally(() => setLoading(false));
@@ -246,7 +258,7 @@ function Search() {
         setLoading(true);
         setError(null);
 
-        fetchResults(searchCategory, searchQuery, searchFilters, searchTypes)
+        fetchResults(searchCategory, searchQuery, searchMode, searchFilters, searchTypes)
             .then(setResults)
             .catch((error) => setError(error.message))
             .finally(() => setLoading(false));
@@ -300,18 +312,34 @@ function Search() {
 
                 <h1>PokéSearch</h1>
 
-                {/* Category */}
-                <div className="search-categories">
-                    {Object.entries(CATEGORIES).map(([key, { label }]) => (
-                        <button
-                            key={key}
-                            type="button"
-                            className={key === category ? "category active" : "category"}
-                            onClick={() => changeCategory(key)}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                <div className="search-toolbar">
+                    {/* Category */}
+                    <div className="search-categories">
+                        {Object.entries(CATEGORIES).map(([key, { label }]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                className={key === category ? "category active" : "category"}
+                                onClick={() => changeCategory(key)}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Search mode: by name (fuzzy) or in descriptions (keywords) */}
+                    <div className="search-modes">
+                        {Object.entries(SEARCH_MODES).map(([key, { label }]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                className={key === searchMode ? "search-mode active" : "search-mode"}
+                                onClick={() => setSearchMode(key)}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit}>
@@ -322,7 +350,7 @@ function Search() {
                             type="text"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder={`Search ${CATEGORIES[category].label.toLowerCase()}...`}
+                            placeholder={SEARCH_MODES[searchMode].placeholder(CATEGORIES[category].label.toLowerCase())}
                         />
 
                         <button type="submit" disabled={loading}>

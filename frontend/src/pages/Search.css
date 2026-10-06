@@ -21,12 +21,22 @@
     letter-spacing: -2px;
 }
 
+/* TOOLBAR: categories on the left, search mode on the right */
+
+.search-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
 /* CATEGORIES */
 
 .search-categories {
     display: flex;
     gap: 10px;
-    margin-bottom: 16px;
 }
 
 .category {
@@ -40,6 +50,33 @@
 
 .category.active {
     background: #f0b429;
+}
+
+/* SEARCH MODES */
+
+.search-modes {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: #e8e9eb;
+}
+
+.search-mode {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    font-size: 14px;
+    font-weight: 700;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.search-mode.active {
+    background: white;
+    opacity: 1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 /* FORM */

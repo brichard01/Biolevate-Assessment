@@ -57,6 +57,7 @@ SEARCH_CATEGORIES = {
 }
 
 MAX_QUERY_LENGTH = 100
+SEARCH_MODES = ["name", "description"]
 
 
 @app.get("/filters")
@@ -76,9 +77,18 @@ def get_types():
 
 
 @app.get("/search")
-def search(category: str, request: Request, q: str = "", types: list[str] = Query([])):
+def search(
+    category: str,
+    request: Request,
+    q: str = "",
+    mode: str = "name",
+    types: list[str] = Query([]),
+):
     if category not in SEARCH_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown category")
+
+    if mode not in SEARCH_MODES:
+        raise HTTPException(status_code=400, detail="Unknown search mode")
 
     if len(q) > MAX_QUERY_LENGTH:
         raise HTTPException(status_code=400, detail="Query is too long")
@@ -102,7 +112,7 @@ def search(category: str, request: Request, q: str = "", types: list[str] = Quer
 
     with get_connection() as conn:
         results = dataquery.search(
-            conn, config["table"], config["columns"], q, minimums, maximums, types
+            conn, config["table"], config["columns"], q, mode, minimums, maximums, types
         )
 
     return {"results": results}
