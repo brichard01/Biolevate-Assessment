@@ -164,6 +164,18 @@ def get_pokemon(pokemon_id: int):
             (pokemon_id,),
         ).fetchall()
 
+        max_stats = conn.execute(
+            """
+            SELECT MAX(hp) AS "hp",
+                   MAX(attack) AS "attack",
+                   MAX(defense) AS "defense",
+                   MAX(special_attack) AS "special-attack",
+                   MAX(special_defense) AS "special-defense",
+                   MAX(speed) AS "speed"
+            FROM pokemon
+            """
+        ).fetchone()
+
     return {
         "id": pokemon["id"],
         "name": pokemon["name"],
@@ -179,6 +191,7 @@ def get_pokemon(pokemon_id: int):
             "special-defense": pokemon["special_defense"],
             "speed": pokemon["speed"],
         },
+        "max_stats": max_stats,
         "abilities": abilities,
         "moves": moves,
         "species": {

@@ -143,7 +143,7 @@ function Pokemon() {
                                 <div className="stat-bar">
                                     <div
                                         className="stat-bar-fill"
-                                        style={{ width: `${Math.min(value, 100)}%` }}
+                                        style={{ width: `${(value / pokemon.max_stats[stat]) * 100}%` }}
                                     />
                                 </div>
                             </div>
