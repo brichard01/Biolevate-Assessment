@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Search.css";
 
@@ -95,23 +95,58 @@ function AbilityPreview({ ability }) {
     );
 }
 
+function fetchResults(category, query, filterValues) {
+    const params = new URLSearchParams({ category, q: query.trim() });
+    for (const [key, value] of Object.entries(filterValues)) {
+        if (value !== "") {
+            params.set(key, value);
+        }
+    }
+
+    return fetch(`http://localhost:8000/search?${params}`)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Search failed. Please try again.");
+            }
+
+            return response.json();
+        })
+        .then((data) => data.results);
+}
+
 function Search() {
     const [category, setCategory] = useState("pokemon");
     const [query, setQuery] = useState("");
     const [filterValues, setFilterValues] = useState({});
 
     const [results, setResults] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const { filters } = CATEGORIES[category];
-    const activeFilters = Object.entries(filterValues).filter(([, value]) => value !== "");
+
+    // Display every Pokémon when the page opens.
+    useEffect(() => {
+        fetchResults("pokemon", "", {})
+            .then(setResults)
+            .catch((error) => setError(error.message))
+            .finally(() => setLoading(false));
+    }, []);
+
+    function runSearch(searchCategory, searchQuery, searchFilters) {
+        setLoading(true);
+        setError(null);
+
+        fetchResults(searchCategory, searchQuery, searchFilters)
+            .then(setResults)
+            .catch((error) => setError(error.message))
+            .finally(() => setLoading(false));
+    }
 
     function changeCategory(newCategory) {
         setCategory(newCategory);
         setFilterValues({});
-        setResults(null);
-        setError(null);
+        runSearch(newCategory, query, {});
     }
 
     function changeFilter(key, value) {
@@ -120,32 +155,7 @@ function Search() {
 
     function handleSubmit(event) {
         event.preventDefault();
-
-        const params = new URLSearchParams({ category, q: query.trim() });
-        for (const [key, value] of activeFilters) {
-            params.set(key, value);
-        }
-
-        setLoading(true);
-        setError(null);
-
-        fetch(`http://localhost:8000/search?${params}`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Search failed. Please try again.");
-                }
-
-                return response.json();
-            })
-            .then((data) => {
-                setResults(data.results);
-            })
-            .catch((error) => {
-                setError(error.message);
-            })
-            .finally(() => {
-                setLoading(false);
-            });
+        runSearch(category, query, filterValues);
     }
 
     return (
