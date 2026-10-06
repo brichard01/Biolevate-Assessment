@@ -106,6 +106,64 @@
     font-size: 14px;
 }
 
+/* TYPE FILTER */
+
+.type-filter {
+    position: relative;
+    margin-top: 16px;
+}
+
+.type-filter summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: white;
+    list-style: none;
+    cursor: pointer;
+}
+
+.type-filter summary::-webkit-details-marker {
+    display: none;
+}
+
+.type-filter summary span {
+    font-size: 13px;
+    text-transform: uppercase;
+    opacity: 0.5;
+}
+
+.type-filter summary strong {
+    font-size: 14px;
+    text-transform: capitalize;
+}
+
+.type-options {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 14px;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.type-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    text-transform: capitalize;
+    cursor: pointer;
+}
+
 /* RANGE SLIDER: two range inputs stacked on top of the same track */
 
 .range-slider {

@@ -2,7 +2,7 @@ import os
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 import query_database as dataquery
@@ -69,8 +69,14 @@ def get_filters():
     return {"pokemon": pokemon_bounds, "move": move_bounds, "ability": {}}
 
 
+@app.get("/types")
+def get_types():
+    with get_connection() as conn:
+        return dataquery.all_types(conn)
+
+
 @app.get("/search")
-def search(category: str, request: Request, q: str = ""):
+def search(category: str, request: Request, q: str = "", types: list[str] = Query([])):
     if category not in SEARCH_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown category")
 
@@ -96,7 +102,7 @@ def search(category: str, request: Request, q: str = ""):
 
     with get_connection() as conn:
         results = dataquery.search(
-            conn, config["table"], config["columns"], q, minimums, maximums
+            conn, config["table"], config["columns"], q, minimums, maximums, types
         )
 
     return {"results": results}

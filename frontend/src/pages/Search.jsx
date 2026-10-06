@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import "./Search.css";
 
 // Each filter is a numeric range: sent as <name>_min and <name>_max.
+// typeFilter: whether results can be filtered by type.
 const CATEGORIES = {
     pokemon: {
         label: "Pokémon",
+        typeFilter: true,
         filters: [
             { name: "hp", label: "HP" },
             { name: "attack", label: "Attack" },
@@ -17,6 +19,7 @@ const CATEGORIES = {
     },
     move: {
         label: "Moves",
+        typeFilter: true,
         filters: [
             { name: "power", label: "Power" },
             { name: "accuracy", label: "Accuracy" },
@@ -27,6 +30,7 @@ const CATEGORIES = {
     },
     ability: {
         label: "Abilities",
+        typeFilter: false,
         filters: [],
     },
 };
@@ -95,12 +99,15 @@ function AbilityPreview({ ability }) {
     );
 }
 
-function fetchResults(category, query, filterValues) {
+function fetchResults(category, query, filterValues, types) {
     const params = new URLSearchParams({ category, q: query.trim() });
     for (const [key, value] of Object.entries(filterValues)) {
         if (value !== "") {
             params.set(key, value);
         }
+    }
+    for (const type of types) {
+        params.append("types", type);
     }
 
     return fetch(`http://localhost:8000/search?${params}`)
@@ -155,21 +162,53 @@ function RangeFilter({ label, bounds, min, max, onChange }) {
     );
 }
 
+// Dropdown with one checkbox per type. Results keep items having at least one checked type.
+function TypeFilter({ types, selected, onToggle, open, onOpenChange }) {
+    return (
+        <details
+            className="type-filter"
+            open={open}
+            onToggle={(event) => onOpenChange(event.currentTarget.open)}
+        >
+            <summary>
+                <span>Types</span>
+                <strong>{selected.length > 0 ? selected.join(", ") : "Any"}</strong>
+            </summary>
+
+            <div className="type-options">
+                {types.map((type) => (
+                    <label key={type} className="type-option">
+                        <input
+                            type="checkbox"
+                            checked={selected.includes(type)}
+                            onChange={() => onToggle(type)}
+                        />
+                        {type}
+                    </label>
+                ))}
+            </div>
+        </details>
+    );
+}
+
 function Search() {
     const [category, setCategory] = useState("pokemon");
     const [query, setQuery] = useState("");
     const [filterValues, setFilterValues] = useState({});
     const [bounds, setBounds] = useState(null);
+    const [allTypes, setAllTypes] = useState([]);
+    const [selectedTypes, setSelectedTypes] = useState([]);
+    const [typeMenuOpen, setTypeMenuOpen] = useState(false);
 
     const [results, setResults] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const { filters } = CATEGORIES[category];
+    const { filters, typeFilter } = CATEGORIES[category];
 
     // Display every Pokémon when the page opens.
     useEffect(() => {
-        fetchResults("pokemon", "", {})
+        fetchResults("pokemon", "", {}, [])
             .then(setResults)
             .catch((error) => setError(error.message))
             .finally(() => setLoading(false));
@@ -189,11 +228,25 @@ function Search() {
             .catch((error) => setError(error.message));
     }, []);
 
-    function runSearch(searchCategory, searchQuery, searchFilters) {
+    // Load the types for the type filter.
+    useEffect(() => {
+        fetch("http://localhost:8000/types")
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Could not load the types.");
+                }
+
+                return response.json();
+            })
+            .then(setAllTypes)
+            .catch((error) => setError(error.message));
+    }, []);
+
+    function runSearch(searchCategory, searchQuery, searchFilters, searchTypes) {
         setLoading(true);
         setError(null);
 
-        fetchResults(searchCategory, searchQuery, searchFilters)
+        fetchResults(searchCategory, searchQuery, searchFilters, searchTypes)
             .then(setResults)
             .catch((error) => setError(error.message))
             .finally(() => setLoading(false));
@@ -202,7 +255,16 @@ function Search() {
     function changeCategory(newCategory) {
         setCategory(newCategory);
         setFilterValues({});
-        runSearch(newCategory, query, {});
+        setSelectedTypes([]);
+        runSearch(newCategory, query, {}, []);
+    }
+
+    function toggleType(type) {
+        if (selectedTypes.includes(type)) {
+            setSelectedTypes(selectedTypes.filter((selected) => selected !== type));
+        } else {
+            setSelectedTypes([...selectedTypes, type]);
+        }
     }
 
     // A handle left at its bound is stored as "" so it is not sent to the backend.
@@ -228,7 +290,8 @@ function Search() {
 
     function handleSubmit(event) {
         event.preventDefault();
-        runSearch(category, query, filterValues);
+        setTypeMenuOpen(false);
+        runSearch(category, query, filterValues, selectedTypes);
     }
 
     return (
@@ -267,7 +330,18 @@ function Search() {
                         </button>
                     </div>
 
-                    {/* Filters */}
+                    {/* Type filter */}
+                    {typeFilter && (
+                        <TypeFilter
+                            types={allTypes}
+                            selected={selectedTypes}
+                            onToggle={toggleType}
+                            open={typeMenuOpen}
+                            onOpenChange={setTypeMenuOpen}
+                        />
+                    )}
+
+                    {/* Stat filters */}
                     {bounds && filters.length > 0 && (
                         <div className="search-filters">
                             {filters.map((filter) => {

@@ -3,6 +3,12 @@ from psycopg import sql
 # Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
 NAME_SIMILARITY_THRESHOLD = 0.3
 
+# Keep a row if it has at least one of the selected types.
+TYPE_CONDITIONS = {
+    "pokemon": "types && %(types)s",  # Pokemon have a list of types: the lists must overlap.
+    "moves": "type = ANY(%(types)s)",  # Moves have a single type.
+}
+
 
 # Pokemon
 
@@ -128,12 +134,31 @@ def move_stat_bounds(conn):
     ).fetchone()
 
 
+# Types
+
+def all_types(conn):
+    # Every type used by at least one Pokemon or one move, e.g. ["bug", "dark", ...].
+    rows = conn.execute(
+        """
+        SELECT unnest(types) AS type FROM pokemon
+        UNION
+        SELECT type FROM moves
+        ORDER BY type
+        """
+    ).fetchall()
+    return [row["type"] for row in rows]
+
+
 # Search
 
-def search(conn, table, columns, query_text, minimums, maximums):
-    # minimums / maximums: {column: value}, e.g. {"speed": 90}.
+def search(conn, table, columns, query_text, minimums, maximums, types):
+    # minimums / maximums: {column: value}, e.g. {"speed": 90}. types: e.g. ["fire", "water"].
     conditions = []
     values = {}
+
+    if types and table in TYPE_CONDITIONS:
+        values["types"] = types
+        conditions.append(sql.SQL(TYPE_CONDITIONS[table]))
 
     for bounds, operator, suffix in [(minimums, ">=", "min"), (maximums, "<=", "max")]:
         for column, value in bounds.items():
