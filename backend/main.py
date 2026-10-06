@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 import query_database as dataquery
-from config import DATABASE_URL
+from config import DATABASE_URL, FRONTEND_PORT
 from embeddings import embed, to_pgvector
 
 app = FastAPI()
@@ -12,8 +12,8 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        f"http://localhost:{FRONTEND_PORT}",
+        f"http://127.0.0.1:{FRONTEND_PORT}",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
