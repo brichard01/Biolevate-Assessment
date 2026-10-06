@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 import query_database as dataquery
+from embeddings import embed, to_pgvector
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://pokedex:pokedex@localhost:5432/pokedex"
@@ -110,10 +111,21 @@ def search(
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"{key} must be a number")
 
+    table, columns = config["table"], config["columns"]
+    description_search = mode == "description" and q.strip() != ""
+
+    if description_search:
+        query_vector = to_pgvector(embed([q])[0])
+
     with get_connection() as conn:
-        results = dataquery.search(
-            conn, config["table"], config["columns"], q, mode, minimums, maximums, types
-        )
+        if description_search:
+            results = dataquery.search_by_description(
+                conn, table, columns, q, query_vector, minimums, maximums, types
+            )
+        else:
+            results = dataquery.search_by_name(
+                conn, table, columns, q, minimums, maximums, types
+            )
 
     return {"results": results}
 

@@ -3,7 +3,12 @@ from psycopg import sql
 # Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
 NAME_SIMILARITY_THRESHOLD = 0.3
 
-# Text column searched in description mode (it must be in the table's BM25 index).
+# Description search (hybrid: BM25 keywords + vector similarity, merged with Reciprocal Rank Fusion).
+CANDIDATES_PER_METHOD = 20  # Best results kept from each method before merging.
+MAX_VECTOR_DISTANCE = 0.75  # Cosine distance above which a vector match is irrelevant.
+RRF_K = 60  # Standard RRF constant: a result scores 1 / (RRF_K + rank) in each list.
+
+# Text column searched in description mode (it must be in the table's BM25 index and embedded).
 DESCRIPTION_COLUMNS = {
     "pokemon": "description",
     "moves": "effect",
@@ -181,44 +186,24 @@ def build_filters(table, minimums, maximums, types):
     return conditions, values
 
 
-def name_match(query_text):
-    # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
-    # word_similarity handles typos and partial names, starts_with ranks prefixes first.
-    name = sql.SQL("replace(name, '-', ' ')")
-    values = {
-        "q": query_text.lower().replace("-", " "),
-        "threshold": NAME_SIMILARITY_THRESHOLD,
-    }
-    condition = sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
-    order_by = sql.SQL(
-        "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
-        "similarity(%(q)s, {name}) DESC, id"
-    ).format(name=name)
-    return condition, order_by, values
-
-
-def description_match(table, query_text):
-    # BM25 keyword search: ||| keeps rows containing at least one word of the query,
-    # pdb.score ranks rows with more (and rarer) matching words first.
-    condition = sql.SQL("{} ||| %(q)s").format(sql.Identifier(DESCRIPTION_COLUMNS[table]))
-    order_by = sql.SQL("pdb.score(id) DESC, id")
-    return condition, order_by, {"q": query_text}
-
-
-def search(conn, table, columns, query_text, mode, minimums, maximums, types):
-    # mode: "name" (fuzzy search on names) or "description" (BM25 search on descriptions).
+def search_by_name(conn, table, columns, query_text, minimums, maximums, types):
     conditions, values = build_filters(table, minimums, maximums, types)
     order_by = sql.SQL("id")
 
-    query_text = query_text.strip()
+    # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
+    # word_similarity handles typos and partial names, starts_with ranks prefixes first.
+    query_text = query_text.strip().lower().replace("-", " ")
     if query_text:
-        if mode == "description":
-            condition, order_by, match_values = description_match(table, query_text)
-        else:
-            condition, order_by, match_values = name_match(query_text)
-
-        conditions.append(condition)
-        values.update(match_values)
+        name = sql.SQL("replace(name, '-', ' ')")
+        values["q"] = query_text
+        values["threshold"] = NAME_SIMILARITY_THRESHOLD
+        conditions.append(
+            sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
+        )
+        order_by = sql.SQL(
+            "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
+            "similarity(%(q)s, {name}) DESC, id"
+        ).format(name=name)
 
     query = sql.SQL("SELECT {columns} FROM {table}").format(
         columns=sql.SQL(", ").join(sql.Identifier(c) for c in columns),
@@ -227,5 +212,61 @@ def search(conn, table, columns, query_text, mode, minimums, maximums, types):
     if conditions:
         query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
     query += sql.SQL(" ORDER BY ") + order_by
+
+    return conn.execute(query, values).fetchall()
+
+
+def search_by_description(conn, table, columns, query_text, query_vector, minimums, maximums, types):
+    # Two searches run separately, so each one can find results the other misses:
+    #   - keyword: BM25 on the description words (exact words, stemmed: "sleeping" -> "sleep")
+    #   - semantic: closest description vectors (meaning, e.g. "fall asleep" -> "sleep")
+    # Their rankings are then merged with Reciprocal Rank Fusion.
+    conditions, values = build_filters(table, minimums, maximums, types)
+    filters = sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("TRUE")
+
+    values.update({
+        "q": query_text,
+        "vector": query_vector,
+        "candidates": CANDIDATES_PER_METHOD,
+        "max_distance": MAX_VECTOR_DISTANCE,
+        "rrf_k": RRF_K,
+    })
+
+    query = sql.SQL("""
+        WITH keyword AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY score DESC, id) AS rank
+            FROM (
+                SELECT id, pdb.score(id) AS score
+                FROM {table}
+                WHERE {text_column} ||| %(q)s AND {filters}
+                ORDER BY score DESC, id
+                LIMIT %(candidates)s
+            ) AS matches
+        ),
+        semantic AS (
+            SELECT id, ROW_NUMBER() OVER (ORDER BY distance, id) AS rank
+            FROM (
+                SELECT id, embedding <=> %(vector)s::vector AS distance
+                FROM {table}
+                WHERE embedding <=> %(vector)s::vector <= %(max_distance)s AND {filters}
+                ORDER BY distance, id
+                LIMIT %(candidates)s
+            ) AS matches
+        ),
+        fused AS (
+            SELECT id, SUM(1.0 / (%(rrf_k)s + rank)) AS score
+            FROM (SELECT * FROM keyword UNION ALL SELECT * FROM semantic) AS ranked
+            GROUP BY id
+        )
+        SELECT {columns}
+        FROM {table}
+        JOIN fused USING (id)
+        ORDER BY fused.score DESC, id
+    """).format(
+        table=sql.Identifier(table),
+        text_column=sql.Identifier(DESCRIPTION_COLUMNS[table]),
+        filters=filters,
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in columns),
+    )
 
     return conn.execute(query, values).fetchall()
