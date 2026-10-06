@@ -56,32 +56,58 @@ SEARCH_CATEGORIES = {
 }
 
 
+# Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
+NAME_SIMILARITY_THRESHOLD = 0.3
+MAX_QUERY_LENGTH = 100
+
+
 @app.get("/search")
-def search(category: str, request: Request):
+def search(category: str, request: Request, q: str = ""):
     if category not in SEARCH_CATEGORIES:
         raise HTTPException(status_code=400, detail="Unknown category")
+
+    if len(q) > MAX_QUERY_LENGTH:
+        raise HTTPException(status_code=400, detail="Query is too long")
 
     config = SEARCH_CATEGORIES[category]
 
     conditions = []
-    values = []
+    values = {}
 
     for column in config["filters"]:
         for suffix, operator in [("min", ">="), ("max", "<=")]:
-            value = request.query_params.get(f"{column}_{suffix}")
+            key = f"{column}_{suffix}"
+            value = request.query_params.get(key)
             if value is None or value == "":
                 continue
 
             try:
-                values.append(int(value))
+                values[key] = int(value)
             except ValueError:
-                raise HTTPException(
-                    status_code=400, detail=f"{column}_{suffix} must be a number"
-                )
+                raise HTTPException(status_code=400, detail=f"{key} must be a number")
 
             conditions.append(
-                sql.SQL("{} {} %s").format(sql.Identifier(column), sql.SQL(operator))
+                sql.SQL("{} {} {}").format(
+                    sql.Identifier(column), sql.SQL(operator), sql.Placeholder(key)
+                )
             )
+
+    # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
+    # word_similarity handles typos and partial names, starts_with ranks prefixes first.
+    query_text = q.strip().lower().replace("-", " ")
+    name = sql.SQL("replace(name, '-', ' ')")
+    order_by = sql.SQL("id")
+
+    if query_text:
+        values["q"] = query_text
+        values["threshold"] = NAME_SIMILARITY_THRESHOLD
+        conditions.append(
+            sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
+        )
+        order_by = sql.SQL(
+            "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
+            "similarity(%(q)s, {name}) DESC, id"
+        ).format(name=name)
 
     # Column and table names only come from SEARCH_CATEGORIES, values are passed as parameters.
     query = sql.SQL("SELECT {columns} FROM {table}").format(
@@ -90,7 +116,7 @@ def search(category: str, request: Request):
     )
     if conditions:
         query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
-    query += sql.SQL(" ORDER BY id")
+    query += sql.SQL(" ORDER BY ") + order_by
 
     with get_connection() as conn:
         results = conn.execute(query, values).fetchall()

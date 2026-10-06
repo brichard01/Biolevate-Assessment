@@ -1,5 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 DROP TABLE IF EXISTS pokemon_moves, pokemon_abilities, pokemon, moves, abilities;
 
