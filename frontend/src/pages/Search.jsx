@@ -6,7 +6,7 @@ import "./Search.css";
 // typeFilter: whether results can be filtered by type.
 const CATEGORIES = {
     pokemon: {
-        label: "Pokémon",
+        label: "Pokémons",
         typeFilter: true,
         filters: [
             { name: "hp", label: "HP" },
@@ -298,7 +298,7 @@ function Search() {
         <main className="search-page">
             <div className="search-container">
 
-                <h1>Pokédex Search</h1>
+                <h1>PokéSearch</h1>
 
                 {/* Category */}
                 <div className="search-categories">
