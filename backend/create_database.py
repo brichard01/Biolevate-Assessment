@@ -4,6 +4,8 @@ import os
 
 import psycopg
 
+from embeddings import embed, to_pgvector
+
 DATA_FILE = "data/pokedex.json"
 DATA_SHA256 = "251b7a02837bcb01a491e40de488ef179c95df7d7cb7e0aec1f4562d9d16cadb"
 SCHEMA_FILE = "schema.sql"
@@ -114,6 +116,18 @@ def insert_relations(cur, pokedex):
     )
 
 
+def insert_embeddings(cur, table, text_column):
+    # Vector of each row's text (description or effect), used by the vector search.
+    cur.execute(f"SELECT id, {text_column} FROM {table} ORDER BY id")
+    rows = cur.fetchall()
+    vectors = embed([text for _, text in rows])
+
+    cur.executemany(
+        f"UPDATE {table} SET embedding = %s::vector WHERE id = %s",
+        [(to_pgvector(vector), row_id) for (row_id, _), vector in zip(rows, vectors)],
+    )
+
+
 def main():
     pokedex = load_pokedex()
 
@@ -128,9 +142,17 @@ def main():
             insert_abilities(cur, pokedex["abilities"])
             insert_relations(cur, pokedex)
 
+            insert_embeddings(cur, "pokemon", "description")
+            insert_embeddings(cur, "moves", "effect")
+            insert_embeddings(cur, "abilities", "effect")
+
             for table in ["pokemon", "moves", "abilities", "pokemon_moves", "pokemon_abilities"]:
                 cur.execute(f"SELECT COUNT(*) FROM {table}")
                 print(f"{table}: {cur.fetchone()[0]}")
+
+            for table in ["pokemon", "moves", "abilities"]:
+                cur.execute(f"SELECT COUNT(*) FROM {table} WHERE embedding IS NOT NULL")
+                print(f"{table} with embedding: {cur.fetchone()[0]}")
 
 
 if __name__ == "__main__":

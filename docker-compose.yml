@@ -10,5 +10,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    command: --model-id sentence-transformers/all-MiniLM-L6-v2
+    ports:
+      - "8080:80"
+    volumes:
+      - models:/data
+
 volumes:
   pgdata:
+  models:
