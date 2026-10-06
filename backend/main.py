@@ -1,8 +1,9 @@
 import os
 
 import psycopg
+from psycopg import sql
 from psycopg.rows import dict_row
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 DATABASE_URL = os.environ.get(
@@ -26,6 +27,77 @@ def get_connection():
     return psycopg.connect(DATABASE_URL, row_factory=dict_row)
 
 
+# For each category: its table, the columns returned for the preview,
+# and the columns that can be filtered with <column>_min / <column>_max.
+SEARCH_CATEGORIES = {
+    "pokemon": {
+        "table": "pokemon",
+        "columns": [
+            "id", "name", "types", "sprite_url", "hp", "attack", "defense",
+            "special_attack", "special_defense", "speed",
+        ],
+        "filters": [
+            "hp", "attack", "defense", "special_attack", "special_defense", "speed",
+        ],
+    },
+    "move": {
+        "table": "moves",
+        "columns": [
+            "id", "name", "type", "damage_class", "power", "accuracy", "pp",
+            "priority", "effect_chance", "short_effect",
+        ],
+        "filters": ["power", "accuracy", "pp", "priority", "effect_chance"],
+    },
+    "ability": {
+        "table": "abilities",
+        "columns": ["id", "name", "short_effect"],
+        "filters": [],
+    },
+}
+
+
+@app.get("/search")
+def search(category: str, request: Request):
+    if category not in SEARCH_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Unknown category")
+
+    config = SEARCH_CATEGORIES[category]
+
+    conditions = []
+    values = []
+
+    for column in config["filters"]:
+        for suffix, operator in [("min", ">="), ("max", "<=")]:
+            value = request.query_params.get(f"{column}_{suffix}")
+            if value is None or value == "":
+                continue
+
+            try:
+                values.append(int(value))
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"{column}_{suffix} must be a number"
+                )
+
+            conditions.append(
+                sql.SQL("{} {} %s").format(sql.Identifier(column), sql.SQL(operator))
+            )
+
+    # Column and table names only come from SEARCH_CATEGORIES, values are passed as parameters.
+    query = sql.SQL("SELECT {columns} FROM {table}").format(
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in config["columns"]),
+        table=sql.Identifier(config["table"]),
+    )
+    if conditions:
+        query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+    query += sql.SQL(" ORDER BY id")
+
+    with get_connection() as conn:
+        results = conn.execute(query, values).fetchall()
+
+    return {"results": results}
+
+
 @app.get("/pokemon/{pokemon_id}")
 def get_pokemon(pokemon_id: int):
     with get_connection() as conn:
@@ -46,7 +118,7 @@ def get_pokemon(pokemon_id: int):
 
         moves = conn.execute(
             """
-            SELECT m.name
+            SELECT m.id, m.name
             FROM moves m
             JOIN pokemon_moves pm ON pm.move_id = m.id
             WHERE pm.pokemon_id = %s
@@ -57,7 +129,7 @@ def get_pokemon(pokemon_id: int):
 
         abilities = conn.execute(
             """
-            SELECT a.name
+            SELECT a.id, a.name
             FROM abilities a
             JOIN pokemon_abilities pa ON pa.ability_id = a.id
             WHERE pa.pokemon_id = %s
@@ -81,8 +153,8 @@ def get_pokemon(pokemon_id: int):
             "special-defense": pokemon["special_defense"],
             "speed": pokemon["speed"],
         },
-        "abilities": [ability["name"] for ability in abilities],
-        "moves": [move["name"] for move in moves],
+        "abilities": abilities,
+        "moves": moves,
         "species": {
             "generation": pokemon["generation"],
             "description": pokemon["description"],
@@ -100,7 +172,7 @@ def get_pokemon(pokemon_id: int):
     }
 
 
-@app.get("/moves/{move_id}")
+@app.get("/move/{move_id}")
 def get_move(move_id: int):
     with get_connection() as conn:
         move = conn.execute(
@@ -118,7 +190,7 @@ def get_move(move_id: int):
 
         pokemon = conn.execute(
             """
-            SELECT p.name
+            SELECT p.id, p.name
             FROM pokemon p
             JOIN pokemon_moves pm ON pm.pokemon_id = p.id
             WHERE pm.move_id = %s
@@ -127,11 +199,11 @@ def get_move(move_id: int):
             (move_id,),
         ).fetchall()
 
-    move["learned_by_pokemon"] = [p["name"] for p in pokemon]
+    move["learned_by_pokemon"] = pokemon
     return move
 
 
-@app.get("/abilities/{ability_id}")
+@app.get("/ability/{ability_id}")
 def get_ability(ability_id: int):
     with get_connection() as conn:
         ability = conn.execute(
@@ -148,7 +220,7 @@ def get_ability(ability_id: int):
 
         pokemon = conn.execute(
             """
-            SELECT p.name
+            SELECT p.id, p.name
             FROM pokemon p
             JOIN pokemon_abilities pa ON pa.pokemon_id = p.id
             WHERE pa.ability_id = %s
@@ -157,5 +229,5 @@ def get_ability(ability_id: int):
             (ability_id,),
         ).fetchall()
 
-    ability["pokemon"] = [p["name"] for p in pokemon]
+    ability["pokemon"] = pokemon
     return ability

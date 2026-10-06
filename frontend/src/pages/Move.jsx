@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import "./Move.css";
 
 function Move() {
@@ -15,7 +15,7 @@ function Move() {
             return;
         }
 
-        fetch(`http://localhost:8000/moves/${id}`)
+        fetch(`http://localhost:8000/move/${id}`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Move not found.");
@@ -122,9 +122,9 @@ function Move() {
 
                     <div className="tags">
                         {move.learned_by_pokemon.map((pokemon) => (
-                            <span className="tag" key={pokemon}>
-                                {pokemon}
-                            </span>
+                            <Link to={`/pokemon?id=${pokemon.id}`} className="tag" key={pokemon.id}>
+                                {pokemon.name}
+                            </Link>
                         ))}
                     </div>
                 </section>

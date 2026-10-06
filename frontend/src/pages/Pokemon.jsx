@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import "./Pokemon.css";
 
 function Pokemon() {
@@ -158,9 +158,9 @@ function Pokemon() {
 
                     <div className="tags">
                         {pokemon.abilities.map((ability) => (
-                            <span className="tag" key={ability}>
-                                {ability}
-                            </span>
+                            <Link to={`/ability?id=${ability.id}`} className="tag" key={ability.id}>
+                                {ability.name}
+                            </Link>
                         ))}
                     </div>
                 </section>
@@ -171,9 +171,9 @@ function Pokemon() {
 
                     <div className="tags moves">
                         {pokemon.moves.map((move) => (
-                            <span className="tag" key={move}>
-                                {move}
-                            </span>
+                            <Link to={`/move?id=${move.id}`} className="tag" key={move.id}>
+                                {move.name}
+                            </Link>
                         ))}
                     </div>
                 </section>

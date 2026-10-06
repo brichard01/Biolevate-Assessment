@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import "./Ability.css";
 
 function Ability() {
@@ -15,7 +15,7 @@ function Ability() {
             return;
         }
 
-        fetch(`http://localhost:8000/abilities/${id}`)
+        fetch(`http://localhost:8000/ability/${id}`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Ability not found.");
@@ -84,9 +84,9 @@ function Ability() {
 
                     <div className="tags">
                         {ability.pokemon.map((pokemon) => (
-                            <span className="tag" key={pokemon}>
-                                {pokemon}
-                            </span>
+                            <Link to={`/pokemon?id=${pokemon.id}`} className="tag" key={pokemon.id}>
+                                {pokemon.name}
+                            </Link>
                         ))}
                     </div>
                 </section>
