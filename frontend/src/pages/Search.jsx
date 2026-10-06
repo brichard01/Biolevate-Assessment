@@ -206,8 +206,13 @@ function Search() {
     }
 
     // A handle left at its bound is stored as "" so it is not sent to the backend.
+    // The backend sends bounds as min_<name> / max_<name>.
+    function boundsOf(name) {
+        return { min: bounds[category][`min_${name}`], max: bounds[category][`max_${name}`] };
+    }
+
     function changeFilter(name, min, max) {
-        const { min: lowest, max: highest } = bounds[category][name];
+        const { min: lowest, max: highest } = boundsOf(name);
 
         setFilterValues({
             ...filterValues,
@@ -266,7 +271,7 @@ function Search() {
                     {bounds && filters.length > 0 && (
                         <div className="search-filters">
                             {filters.map((filter) => {
-                                const filterBounds = bounds[category][filter.name];
+                                const filterBounds = boundsOf(filter.name);
 
                                 return (
                                     <RangeFilter

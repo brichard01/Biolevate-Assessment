@@ -1,10 +1,11 @@
 import os
 
 import psycopg
-from psycopg import sql
 from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+import query_database as dataquery
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://pokedex:pokedex@localhost:5432/pokedex"
@@ -55,43 +56,17 @@ SEARCH_CATEGORIES = {
     },
 }
 
+MAX_QUERY_LENGTH = 100
+
 
 @app.get("/filters")
 def get_filters():
-    # Min and max of every filterable column, used as bounds for the sliders.
-    filters = {}
-
+    # Bounds of the search sliders, e.g. {"pokemon": {"min_hp": 10, "max_hp": 250, ...}}.
     with get_connection() as conn:
-        for category, config in SEARCH_CATEGORIES.items():
-            filters[category] = {}
-            if not config["filters"]:
-                continue
+        pokemon_bounds = dataquery.pokemon_stat_bounds(conn)
+        move_bounds = dataquery.move_stat_bounds(conn)
 
-            query = sql.SQL("SELECT {aggregates} FROM {table}").format(
-                aggregates=sql.SQL(", ").join(
-                    sql.SQL("MIN({column}) AS {min}, MAX({column}) AS {max}").format(
-                        column=sql.Identifier(column),
-                        min=sql.Identifier(f"{column}_min"),
-                        max=sql.Identifier(f"{column}_max"),
-                    )
-                    for column in config["filters"]
-                ),
-                table=sql.Identifier(config["table"]),
-            )
-            row = conn.execute(query).fetchone()
-
-            for column in config["filters"]:
-                filters[category][column] = {
-                    "min": row[f"{column}_min"],
-                    "max": row[f"{column}_max"],
-                }
-
-    return filters
-
-
-# Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
-NAME_SIMILARITY_THRESHOLD = 0.3
-MAX_QUERY_LENGTH = 100
+    return {"pokemon": pokemon_bounds, "move": move_bounds, "ability": {}}
 
 
 @app.get("/search")
@@ -104,55 +79,25 @@ def search(category: str, request: Request, q: str = ""):
 
     config = SEARCH_CATEGORIES[category]
 
-    conditions = []
-    values = {}
+    minimums = {}
+    maximums = {}
 
     for column in config["filters"]:
-        for suffix, operator in [("min", ">="), ("max", "<=")]:
+        for suffix, bounds in [("min", minimums), ("max", maximums)]:
             key = f"{column}_{suffix}"
             value = request.query_params.get(key)
             if value is None or value == "":
                 continue
 
             try:
-                values[key] = int(value)
+                bounds[column] = int(value)
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"{key} must be a number")
 
-            conditions.append(
-                sql.SQL("{} {} {}").format(
-                    sql.Identifier(column), sql.SQL(operator), sql.Placeholder(key)
-                )
-            )
-
-    # Fuzzy name search: names are compared without hyphens ("thunder-punch" -> "thunder punch").
-    # word_similarity handles typos and partial names, starts_with ranks prefixes first.
-    query_text = q.strip().lower().replace("-", " ")
-    name = sql.SQL("replace(name, '-', ' ')")
-    order_by = sql.SQL("id")
-
-    if query_text:
-        values["q"] = query_text
-        values["threshold"] = NAME_SIMILARITY_THRESHOLD
-        conditions.append(
-            sql.SQL("word_similarity(%(q)s, {name}) >= %(threshold)s").format(name=name)
-        )
-        order_by = sql.SQL(
-            "starts_with({name}, %(q)s) DESC, word_similarity(%(q)s, {name}) DESC, "
-            "similarity(%(q)s, {name}) DESC, id"
-        ).format(name=name)
-
-    # Column and table names only come from SEARCH_CATEGORIES, values are passed as parameters.
-    query = sql.SQL("SELECT {columns} FROM {table}").format(
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in config["columns"]),
-        table=sql.Identifier(config["table"]),
-    )
-    if conditions:
-        query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
-    query += sql.SQL(" ORDER BY ") + order_by
-
     with get_connection() as conn:
-        results = conn.execute(query, values).fetchall()
+        results = dataquery.search(
+            conn, config["table"], config["columns"], q, minimums, maximums
+        )
 
     return {"results": results}
 
@@ -160,87 +105,30 @@ def search(category: str, request: Request, q: str = ""):
 @app.get("/pokemon/{pokemon_id}")
 def get_pokemon(pokemon_id: int):
     with get_connection() as conn:
-        pokemon = conn.execute(
-            """
-            SELECT id, name, types, height_dm, weight_hg, base_experience,
-                   hp, attack, defense, special_attack, special_defense, speed,
-                   generation, description, genus, color, shape, habitat,
-                   is_legendary, is_mythical, sprite_url, artwork_url
-            FROM pokemon
-            WHERE id = %s
-            """,
-            (pokemon_id,),
-        ).fetchone()
+        pokemon = dataquery.pokemon_by_id(conn, pokemon_id)
 
         if pokemon is None:
             raise HTTPException(status_code=404, detail="Pokemon not found")
 
-        moves = conn.execute(
-            """
-            SELECT m.id, m.name
-            FROM moves m
-            JOIN pokemon_moves pm ON pm.move_id = m.id
-            WHERE pm.pokemon_id = %s
-            ORDER BY m.name
-            """,
-            (pokemon_id,),
-        ).fetchall()
-
-        abilities = conn.execute(
-            """
-            SELECT a.id, a.name
-            FROM abilities a
-            JOIN pokemon_abilities pa ON pa.ability_id = a.id
-            WHERE pa.pokemon_id = %s
-            ORDER BY a.name
-            """,
-            (pokemon_id,),
-        ).fetchall()
-
-        max_stats = conn.execute(
-            """
-            SELECT MAX(hp) AS hp,
-                   MAX(attack) AS attack,
-                   MAX(defense) AS defense,
-                   MAX(special_attack) AS special_attack,
-                   MAX(special_defense) AS special_defense,
-                   MAX(speed) AS speed
-            FROM pokemon
-            """
-        ).fetchone()
+        moves = dataquery.moves_by_pokemon_id(conn, pokemon_id)
+        abilities = dataquery.abilities_by_pokemon_id(conn, pokemon_id)
+        stat_bounds = dataquery.pokemon_stat_bounds(conn)
 
     pokemon["moves"] = moves
     pokemon["abilities"] = abilities
-    pokemon["max_stats"] = max_stats
+    pokemon["stat_bounds"] = stat_bounds
     return pokemon
 
 
 @app.get("/move/{move_id}")
 def get_move(move_id: int):
     with get_connection() as conn:
-        move = conn.execute(
-            """
-            SELECT id, name, type, power, pp, accuracy, priority, damage_class,
-                   effect_chance, effect, short_effect, generation
-            FROM moves
-            WHERE id = %s
-            """,
-            (move_id,),
-        ).fetchone()
+        move = dataquery.move_by_id(conn, move_id)
 
         if move is None:
             raise HTTPException(status_code=404, detail="Move not found")
 
-        pokemon = conn.execute(
-            """
-            SELECT p.id, p.name
-            FROM pokemon p
-            JOIN pokemon_moves pm ON pm.pokemon_id = p.id
-            WHERE pm.move_id = %s
-            ORDER BY p.name
-            """,
-            (move_id,),
-        ).fetchall()
+        pokemon = dataquery.pokemon_by_move_id(conn, move_id)
 
     move["learned_by_pokemon"] = pokemon
     return move
@@ -249,28 +137,12 @@ def get_move(move_id: int):
 @app.get("/ability/{ability_id}")
 def get_ability(ability_id: int):
     with get_connection() as conn:
-        ability = conn.execute(
-            """
-            SELECT id, name, effect, short_effect, generation, is_main_series
-            FROM abilities
-            WHERE id = %s
-            """,
-            (ability_id,),
-        ).fetchone()
+        ability = dataquery.ability_by_id(conn, ability_id)
 
         if ability is None:
             raise HTTPException(status_code=404, detail="Ability not found")
 
-        pokemon = conn.execute(
-            """
-            SELECT p.id, p.name
-            FROM pokemon p
-            JOIN pokemon_abilities pa ON pa.pokemon_id = p.id
-            WHERE pa.ability_id = %s
-            ORDER BY p.name
-            """,
-            (ability_id,),
-        ).fetchall()
+        pokemon = dataquery.pokemon_by_ability_id(conn, ability_id)
 
     ability["pokemon"] = pokemon
     return ability
