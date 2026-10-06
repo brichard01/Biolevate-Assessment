@@ -10,33 +10,32 @@ function Move() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!id) {
-            setError("No move ID provided.");
-            return;
+        if (id) {
+            fetch(`http://localhost:8000/move/${id}`)
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Move not found.");
+                    }
+
+                    return response.json();
+                })
+                .then((data) => {
+                    setMove(data);
+                })
+                .catch((error) => {
+                    setError(error.message);
+                });
         }
-
-        fetch(`http://localhost:8000/move/${id}`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Move not found.");
-                }
-
-                return response.json();
-            })
-            .then((data) => {
-                setMove(data);
-            })
-            .catch((error) => {
-                setError(error.message);
-            });
     }, [id]);
 
-    if (error) {
+    const errorMessage = id ? error : "No move ID provided.";
+
+    if (errorMessage) {
         return (
             <main className="move-page">
                 <div className="move-error">
                     <h1>Oops!</h1>
-                    <p>{error}</p>
+                    <p>{errorMessage}</p>
                 </div>
             </main>
         );

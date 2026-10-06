@@ -10,33 +10,32 @@ function Pokemon() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (!id) {
-            setError("No Pokémon ID provided.");
-            return;
+        if (id) {
+            fetch(`http://localhost:8000/pokemon/${id}`)
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Pokémon not found.");
+                    }
+
+                    return response.json();
+                })
+                .then((data) => {
+                    setPokemon(data);
+                })
+                .catch((error) => {
+                    setError(error.message);
+                });
         }
-
-        fetch(`http://localhost:8000/pokemon/${id}`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Pokémon not found.");
-                }
-
-                return response.json();
-            })
-            .then((data) => {
-                setPokemon(data);
-            })
-            .catch((error) => {
-                setError(error.message);
-            });
     }, [id]);
 
-    if (error) {
+    const errorMessage = id ? error : "No Pokémon ID provided.";
+
+    if (errorMessage) {
         return (
             <main className="pokemon-page">
                 <div className="pokemon-error">
                     <h1>Oops!</h1>
-                    <p>{error}</p>
+                    <p>{errorMessage}</p>
                 </div>
             </main>
         );
