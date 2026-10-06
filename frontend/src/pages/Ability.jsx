@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { API_URL } from "../config";
 import "./Ability.css";
 
 function Ability() {
@@ -11,7 +12,7 @@ function Ability() {
 
     useEffect(() => {
         if (id) {
-            fetch(`http://localhost:8000/ability/${id}`)
+            fetch(`${API_URL}/ability/${id}`)
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error("Ability not found.");

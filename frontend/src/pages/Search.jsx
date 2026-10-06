@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { API_URL } from "../config";
 import "./Search.css";
 
 // Each filter is a numeric range: sent as <name>_min and <name>_max.
@@ -121,7 +122,7 @@ function fetchResults(category, query, mode, filterValues, types) {
         params.append("types", type);
     }
 
-    return fetch(`http://localhost:8000/search?${params}`)
+    return fetch(`${API_URL}/search?${params}`)
         .then((response) => {
             if (!response.ok) {
                 throw new Error("Search failed. Please try again.");
@@ -228,7 +229,7 @@ function Search() {
 
     // Load the min and max of every filter for the sliders.
     useEffect(() => {
-        fetch("http://localhost:8000/filters")
+        fetch(`${API_URL}/filters`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Could not load the filters.");
@@ -242,7 +243,7 @@ function Search() {
 
     // Load the types for the type filter.
     useEffect(() => {
-        fetch("http://localhost:8000/types")
+        fetch(`${API_URL}/types`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Could not load the types.");

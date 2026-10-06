@@ -1,16 +1,11 @@
-import os
-
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 import query_database as dataquery
+from config import DATABASE_URL
 from embeddings import embed, to_pgvector
-
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "postgresql://pokedex:pokedex@localhost:5432/pokedex"
-)
 
 app = FastAPI()
 

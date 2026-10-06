@@ -1,17 +1,14 @@
 import hashlib
 import json
-import os
 
 import psycopg
 
+from config import DATABASE_URL
 from embeddings import embed, to_pgvector
 
 DATA_FILE = "data/pokedex.json"
 DATA_SHA256 = "251b7a02837bcb01a491e40de488ef179c95df7d7cb7e0aec1f4562d9d16cadb"
 SCHEMA_FILE = "schema.sql"
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL", "postgresql://pokedex:pokedex@localhost:5432/pokedex"
-)
 
 
 def load_pokedex():

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { API_URL } from "../config";
 import "./Pokemon.css";
 
 const STATS = [
@@ -20,7 +21,7 @@ function Pokemon() {
 
     useEffect(() => {
         if (id) {
-            fetch(`http://localhost:8000/pokemon/${id}`)
+            fetch(`${API_URL}/pokemon/${id}`)
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error("Pokémon not found.");

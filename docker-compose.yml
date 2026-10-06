@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: pokedex
       POSTGRES_DB: pokedex
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -14,7 +14,7 @@ services:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
     command: --model-id sentence-transformers/all-MiniLM-L6-v2
     ports:
-      - "8080:80"
+      - "${EMBEDDINGS_PORT:-8080}:80"
     volumes:
       - models:/data
 

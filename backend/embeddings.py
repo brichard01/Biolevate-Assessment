@@ -1,8 +1,7 @@
 import json
-import os
 import urllib.request
 
-EMBEDDINGS_URL = os.environ.get("EMBEDDINGS_URL", "http://localhost:8080")
+from config import EMBEDDINGS_URL
 
 BATCH_SIZE = 32
 

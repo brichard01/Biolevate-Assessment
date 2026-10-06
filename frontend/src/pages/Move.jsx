@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { API_URL } from "../config";
 import "./Move.css";
 
 function Move() {
@@ -11,7 +12,7 @@ function Move() {
 
     useEffect(() => {
         if (id) {
-            fetch(`http://localhost:8000/move/${id}`)
+            fetch(`${API_URL}/move/${id}`)
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error("Move not found.");
