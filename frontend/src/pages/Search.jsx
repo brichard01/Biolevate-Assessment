@@ -114,10 +114,52 @@ function fetchResults(category, query, filterValues) {
         .then((data) => data.results);
 }
 
+// Slider with two handles. The colored part between the handles is the selected range.
+function RangeFilter({ label, bounds, min, max, onChange }) {
+    const left = ((min - bounds.min) / (bounds.max - bounds.min)) * 100;
+    const right = ((max - bounds.min) / (bounds.max - bounds.min)) * 100;
+
+    // When both handles are at the far right, only the min handle can move.
+    const minOnTop = min === bounds.max;
+
+    return (
+        <div className="search-filter">
+            <div className="search-filter-header">
+                <span>{label}</span>
+                <strong>{min} – {max}</strong>
+            </div>
+
+            <div className="range-slider">
+                <div className="range-track" />
+                <div className="range-fill" style={{ left: `${left}%`, width: `${right - left}%` }} />
+
+                <input
+                    type="range"
+                    min={bounds.min}
+                    max={bounds.max}
+                    value={min}
+                    aria-label={`${label} min`}
+                    onChange={(event) => onChange(Math.min(Number(event.target.value), max), max)}
+                    style={minOnTop ? { zIndex: 1 } : undefined}
+                />
+                <input
+                    type="range"
+                    min={bounds.min}
+                    max={bounds.max}
+                    value={max}
+                    aria-label={`${label} max`}
+                    onChange={(event) => onChange(min, Math.max(Number(event.target.value), min))}
+                />
+            </div>
+        </div>
+    );
+}
+
 function Search() {
     const [category, setCategory] = useState("pokemon");
     const [query, setQuery] = useState("");
     const [filterValues, setFilterValues] = useState({});
+    const [bounds, setBounds] = useState(null);
 
     const [results, setResults] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -131,6 +173,20 @@ function Search() {
             .then(setResults)
             .catch((error) => setError(error.message))
             .finally(() => setLoading(false));
+    }, []);
+
+    // Load the min and max of every filter for the sliders.
+    useEffect(() => {
+        fetch("http://localhost:8000/filters")
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Could not load the filters.");
+                }
+
+                return response.json();
+            })
+            .then(setBounds)
+            .catch((error) => setError(error.message));
     }, []);
 
     function runSearch(searchCategory, searchQuery, searchFilters) {
@@ -149,8 +205,20 @@ function Search() {
         runSearch(newCategory, query, {});
     }
 
-    function changeFilter(key, value) {
-        setFilterValues({ ...filterValues, [key]: value });
+    // A handle left at its bound is stored as "" so it is not sent to the backend.
+    function changeFilter(name, min, max) {
+        const { min: lowest, max: highest } = bounds[category][name];
+
+        setFilterValues({
+            ...filterValues,
+            [`${name}_min`]: min === lowest ? "" : min,
+            [`${name}_max`]: max === highest ? "" : max,
+        });
+    }
+
+    function filterValue(key, bound) {
+        const value = filterValues[key];
+        return value === undefined || value === "" ? bound : value;
     }
 
     function handleSubmit(event) {
@@ -195,30 +263,22 @@ function Search() {
                     </div>
 
                     {/* Filters */}
-                    {filters.length > 0 && (
+                    {bounds && filters.length > 0 && (
                         <div className="search-filters">
-                            {filters.map((filter) => (
-                                <div className="search-filter" key={filter.name}>
-                                    <span>{filter.label}</span>
+                            {filters.map((filter) => {
+                                const filterBounds = bounds[category][filter.name];
 
-                                    <div className="search-filter-range">
-                                        <input
-                                            type="number"
-                                            placeholder="Min"
-                                            aria-label={`${filter.label} min`}
-                                            value={filterValues[`${filter.name}_min`] ?? ""}
-                                            onChange={(event) => changeFilter(`${filter.name}_min`, event.target.value)}
-                                        />
-                                        <input
-                                            type="number"
-                                            placeholder="Max"
-                                            aria-label={`${filter.label} max`}
-                                            value={filterValues[`${filter.name}_max`] ?? ""}
-                                            onChange={(event) => changeFilter(`${filter.name}_max`, event.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                                return (
+                                    <RangeFilter
+                                        key={filter.name}
+                                        label={filter.label}
+                                        bounds={filterBounds}
+                                        min={filterValue(`${filter.name}_min`, filterBounds.min)}
+                                        max={filterValue(`${filter.name}_max`, filterBounds.max)}
+                                        onChange={(min, max) => changeFilter(filter.name, min, max)}
+                                    />
+                                );
+                            })}
                         </div>
                     )}
 

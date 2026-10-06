@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import "./Pokemon.css";
 
+const STATS = [
+    { name: "hp", label: "HP" },
+    { name: "attack", label: "Attack" },
+    { name: "defense", label: "Defense" },
+    { name: "special_attack", label: "Special Attack" },
+    { name: "special_defense", label: "Special Defense" },
+    { name: "speed", label: "Speed" },
+];
+
 function Pokemon() {
     const [searchParams] = useSearchParams();
     const id = searchParams.get("id");
@@ -63,7 +72,7 @@ function Pokemon() {
 
                     <div className="pokemon-image-container">
                         <img
-                            src={pokemon.images.official_artwork}
+                            src={pokemon.artwork_url}
                             alt={pokemon.name}
                             className="pokemon-image"
                         />
@@ -84,10 +93,10 @@ function Pokemon() {
 
                 {/* Description */}
                 <section className="pokemon-section pokemon-description">
-                    <p>{pokemon.species.description}</p>
+                    <p>{pokemon.description}</p>
 
                     <span className="pokemon-genus">
-                        {pokemon.species.genus}
+                        {pokemon.genus}
                     </span>
                 </section>
 
@@ -98,27 +107,27 @@ function Pokemon() {
                     <div className="profile-grid">
                         <div className="profile-item">
                             <span>Height</span>
-                            <strong>{pokemon.height_decimetres / 10} m</strong>
+                            <strong>{pokemon.height_dm / 10} m</strong>
                         </div>
 
                         <div className="profile-item">
                             <span>Weight</span>
-                            <strong>{pokemon.weight_hectograms / 10} kg</strong>
+                            <strong>{pokemon.weight_hg / 10} kg</strong>
                         </div>
 
                         <div className="profile-item">
                             <span>Color</span>
-                            <strong>{pokemon.species.color}</strong>
+                            <strong>{pokemon.color}</strong>
                         </div>
 
                         <div className="profile-item">
                             <span>Habitat</span>
-                            <strong>{pokemon.species.habitat}</strong>
+                            <strong>{pokemon.habitat}</strong>
                         </div>
 
                         <div className="profile-item">
                             <span>Generation</span>
-                            <strong>{pokemon.species.generation}</strong>
+                            <strong>{pokemon.generation}</strong>
                         </div>
 
                         <div className="profile-item">
@@ -133,17 +142,17 @@ function Pokemon() {
                     <h2>Base Stats</h2>
 
                     <div className="stats">
-                        {Object.entries(pokemon.stats).map(([stat, value]) => (
-                            <div className="stat" key={stat}>
+                        {STATS.map((stat) => (
+                            <div className="stat" key={stat.name}>
                                 <div className="stat-header">
-                                    <span>{stat.replace("-", " ")}</span>
-                                    <strong>{value}</strong>
+                                    <span>{stat.label}</span>
+                                    <strong>{pokemon[stat.name]}</strong>
                                 </div>
 
                                 <div className="stat-bar">
                                     <div
                                         className="stat-bar-fill"
-                                        style={{ width: `${(value / pokemon.max_stats[stat]) * 100}%` }}
+                                        style={{ width: `${(pokemon[stat.name] / pokemon.max_stats[stat.name]) * 100}%` }}
                                     />
                                 </div>
                             </div>

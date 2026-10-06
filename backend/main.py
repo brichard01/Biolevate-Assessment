@@ -56,6 +56,39 @@ SEARCH_CATEGORIES = {
 }
 
 
+@app.get("/filters")
+def get_filters():
+    # Min and max of every filterable column, used as bounds for the sliders.
+    filters = {}
+
+    with get_connection() as conn:
+        for category, config in SEARCH_CATEGORIES.items():
+            filters[category] = {}
+            if not config["filters"]:
+                continue
+
+            query = sql.SQL("SELECT {aggregates} FROM {table}").format(
+                aggregates=sql.SQL(", ").join(
+                    sql.SQL("MIN({column}) AS {min}, MAX({column}) AS {max}").format(
+                        column=sql.Identifier(column),
+                        min=sql.Identifier(f"{column}_min"),
+                        max=sql.Identifier(f"{column}_max"),
+                    )
+                    for column in config["filters"]
+                ),
+                table=sql.Identifier(config["table"]),
+            )
+            row = conn.execute(query).fetchone()
+
+            for column in config["filters"]:
+                filters[category][column] = {
+                    "min": row[f"{column}_min"],
+                    "max": row[f"{column}_max"],
+                }
+
+    return filters
+
+
 # Minimum trigram similarity for a name to match the query (0 = anything, 1 = exact).
 NAME_SIMILARITY_THRESHOLD = 0.3
 MAX_QUERY_LENGTH = 100
@@ -166,49 +199,20 @@ def get_pokemon(pokemon_id: int):
 
         max_stats = conn.execute(
             """
-            SELECT MAX(hp) AS "hp",
-                   MAX(attack) AS "attack",
-                   MAX(defense) AS "defense",
-                   MAX(special_attack) AS "special-attack",
-                   MAX(special_defense) AS "special-defense",
-                   MAX(speed) AS "speed"
+            SELECT MAX(hp) AS hp,
+                   MAX(attack) AS attack,
+                   MAX(defense) AS defense,
+                   MAX(special_attack) AS special_attack,
+                   MAX(special_defense) AS special_defense,
+                   MAX(speed) AS speed
             FROM pokemon
             """
         ).fetchone()
 
-    return {
-        "id": pokemon["id"],
-        "name": pokemon["name"],
-        "height_decimetres": pokemon["height_dm"],
-        "weight_hectograms": pokemon["weight_hg"],
-        "base_experience": pokemon["base_experience"],
-        "types": pokemon["types"],
-        "stats": {
-            "hp": pokemon["hp"],
-            "attack": pokemon["attack"],
-            "defense": pokemon["defense"],
-            "special-attack": pokemon["special_attack"],
-            "special-defense": pokemon["special_defense"],
-            "speed": pokemon["speed"],
-        },
-        "max_stats": max_stats,
-        "abilities": abilities,
-        "moves": moves,
-        "species": {
-            "generation": pokemon["generation"],
-            "description": pokemon["description"],
-            "genus": pokemon["genus"],
-            "color": pokemon["color"],
-            "shape": pokemon["shape"],
-            "habitat": pokemon["habitat"],
-            "is_legendary": pokemon["is_legendary"],
-            "is_mythical": pokemon["is_mythical"],
-        },
-        "images": {
-            "sprite": pokemon["sprite_url"],
-            "official_artwork": pokemon["artwork_url"],
-        },
-    }
+    pokemon["moves"] = moves
+    pokemon["abilities"] = abilities
+    pokemon["max_stats"] = max_stats
+    return pokemon
 
 
 @app.get("/move/{move_id}")

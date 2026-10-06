@@ -83,27 +83,84 @@
     margin-top: 16px;
 }
 
-.search-filter span {
-    display: block;
-    margin-bottom: 6px;
+.search-filter {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: white;
+}
+
+.search-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+
+.search-filter-header span {
     font-size: 13px;
     text-transform: uppercase;
     opacity: 0.5;
 }
 
-.search-filter-range {
-    display: flex;
-    gap: 6px;
+.search-filter-header strong {
+    font-size: 14px;
 }
 
-.search-filter-range input {
+/* RANGE SLIDER: two range inputs stacked on top of the same track */
+
+.range-slider {
+    position: relative;
+    height: 18px;
+}
+
+.range-track,
+.range-fill {
+    position: absolute;
+    top: 50%;
+    height: 6px;
+    border-radius: 999px;
+    transform: translateY(-50%);
+}
+
+.range-track {
+    left: 0;
+    right: 0;
+    background: #e8e9eb;
+}
+
+.range-fill {
+    background: #f0b429;
+}
+
+.range-slider input[type="range"] {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    min-width: 0;
-    padding: 8px 10px;
-    border: none;
-    border-radius: 10px;
+    margin: 0;
+    background: none;
+    appearance: none;
+    pointer-events: none;
+}
+
+.range-slider input[type="range"]::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #f0b429;
+    border-radius: 50%;
     background: white;
-    font-size: 14px;
+    appearance: none;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.range-slider input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 3px solid #f0b429;
+    border-radius: 50%;
+    background: white;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 /* RESULTS */
