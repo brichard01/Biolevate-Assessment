@@ -1,6 +1,10 @@
 # PokéSearch
 
+PokéSearch is a search engine for the Kanto Pokédex. Trainers can find a Pokémon, a move or an ability from a partial or misspelled name, or by describing what they are looking for, and narrow the results with type and stat filters.
+
 ## To run the app
+
+Requirements: Docker, Conda (or Python 3.12) and Node.js 20.19+.
 
 0. Configuration (no credentials, just ports)
 
@@ -32,7 +36,7 @@ python create_database.py
 uvicorn main:app --port 8000
 ```
 
-4. Frontend
+4. Frontend (in another terminal, from the root of the project)
 
 ```sh
 cd frontend
@@ -45,6 +49,13 @@ Tests (from backend/)
 ```sh
 pytest
 ```
+
+## Supported needs
+
+- **Find something from a partial or misspelled name**: Name mode tolerates typos and incomplete names (`bulba`, `pikchu`).
+- **Find and compare candidates from practical criteria**: type and stat filters, with the stats shown in each result (a fast Electric Pokémon).
+- **Find moves or abilities without knowing their names**: Description mode searches what they do, including with synonyms (`put the opponent to sleep`).
+- **Explore a strategy** (partly supported): Description mode finds a starting point, like the rain abilities, and the detail pages lead to the related Pokémon and moves. There is no search across categories: this was left out on purpose to keep each list clear (see the decisions below).
 
 ## Architecture
 
@@ -134,6 +145,10 @@ BM25 finds the exact words ("sleep" in "Puts the target to sleep") but misses sy
 - **Automated tests** (`pytest`, 13 tests): successful retrieval, invalid input (400, 404, 422), the filters, and the relevance of the queries above (partial names, typos, keywords, synonyms).
 - **Data loading**: `create_database.py` checks the SHA-256 of `pokedex.json`, and the row counts were compared with the JSON (151 Pokémon, 164 moves, 114 abilities and all their relations).
 - **Manual checks**: each challenge was tried in the interface, and the setup was tested from scratch (empty Docker, fresh install) following the steps of this README.
+
+## Time spent
+
+About 12 to 13 hours.
 
 ## AI disclosure
 
