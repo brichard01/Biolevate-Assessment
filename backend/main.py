@@ -1,11 +1,16 @@
+import logging
+
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 import query_database as dataquery
 from config import DATABASE_URL, FRONTEND_PORT
-from embeddings import embed, to_pgvector
+import embeddings
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -21,7 +26,29 @@ app.add_middleware(
 
 
 def get_connection():
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=5)
+
+
+# Error handling: the real error is loggeds, the client only gets a generic message
+GENERIC_ERROR = "Something went wrong. Please try again later."
+
+
+@app.exception_handler(embeddings.EmbeddingsUnavailable)
+def embeddings_unavailable(request: Request, error: embeddings.EmbeddingsUnavailable):
+    logger.error("Embeddings service error: %s", error)
+    return JSONResponse(status_code=503, content={"detail": GENERIC_ERROR},)
+
+
+@app.exception_handler(psycopg.OperationalError)
+def database_unavailable(request: Request, error: psycopg.OperationalError):
+    logger.error("Database unavailable: %s", error)
+    return JSONResponse(status_code=503, content={"detail": GENERIC_ERROR})
+
+
+@app.exception_handler(Exception)
+def unexpected_error(request: Request, error: Exception):
+    logger.exception("Unexpected error: %s", error)
+    return JSONResponse(status_code=500, content={"detail": GENERIC_ERROR})
 
 
 # For each category: its table, the columns returned for the preview,
@@ -110,7 +137,7 @@ def search(
     description_search = mode == "description" and q.strip() != ""
 
     if description_search:
-        query_vector = to_pgvector(embed([q])[0])
+        query_vector = embeddings.to_pgvector(embeddings.embed([q])[0])
 
     with get_connection() as conn:
         if description_search:
