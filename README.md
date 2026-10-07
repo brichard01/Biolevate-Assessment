@@ -126,7 +126,7 @@ BM25 finds the exact words ("sleep" in "Puts the target to sleep") but misses sy
 ## Known limitations and next steps
 
 - **Relevance is tested, not measured.** The tests check expected results for key queries, but there is no evaluation set to score the search as a whole. The next step is to build one: a list of queries with their expected results, scored with recall and MRR. It would show how BM25, vectors and the hybrid search compare, and help tune the weight of each method in the fusion. Today both count the same, so BM25 can push unrelated results up when the query contains common words.
-- **Limited test coverage.** The backend has a few key tests (retrieval, invalid input, filters, relevance of the main queries) and the frontend has none. The next step is to measure coverage, test the remaining backend paths, and add component tests for the search page.
+- **Limited test coverage.** The backend has a few key tests (retrieval, invalid input, no result, filters, relevance of the main queries) and the frontend has none. The next step is to measure coverage, test the remaining backend paths, and add component tests for the search page.
 - **No pagination.** `/search` returns every matching result, which is fine for this dataset but not for a large one. The next step is a `limit` / `offset` (or cursor) parameter, with the frontend loading more results on demand.
 - **The backend and frontend are not containerized.** Only the database and the embeddings run in Docker. Adding a Dockerfile for the backend (FastAPI with uvicorn) and the frontend (the Vite build served as static files) would start the whole app with `docker compose up`, and would let the backend run as several replicas behind a load balancer, since it keeps no state.
 
@@ -142,7 +142,7 @@ BM25 finds the exact words ("sleep" in "Puts the target to sleep") but misses sy
 
 ## Validation
 
-- **Automated tests** (`pytest`, 13 tests): successful retrieval, invalid input (400, 404, 422), the filters, and the relevance of the queries above (partial names, typos, keywords, synonyms).
+- **Automated tests** (`pytest`, 14 tests): successful retrieval, invalid input (400, 404, 422), no result, the filters, and the relevance of the queries above (partial names, typos, keywords, synonyms).
 - **Data loading**: `create_database.py` checks the SHA-256 of `pokedex.json`, and the row counts were compared with the JSON (151 Pokémon, 164 moves, 114 abilities and all their relations).
 - **Manual checks**: each challenge was tried in the interface, and the setup was tested from scratch (empty Docker, fresh install) following the steps of this README.
 

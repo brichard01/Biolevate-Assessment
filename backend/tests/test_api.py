@@ -61,6 +61,12 @@ def test_missing_category_is_rejected():
     assert client.get("/search").status_code == 422
 
 
+# No result
+
+def test_name_search_without_match():
+    assert search(category="pokemon", q="zzzzzzzz") == []
+
+
 # Name search: partial names and typos
 
 def test_name_search_finds_partial_name_first():
